@@ -1,11 +1,7 @@
-// src/app/page.tsx
+import LoginButton from '@/components/header/LoginButton'
 
-import BabylonScene from '@/components/BabylonScene';
-
-export default function HomePage() {
+export default function Page() {
   return (
-    <main style={{ margin: 0, padding: 0 }}>
-      <BabylonScene />
-    </main>
-  );
+    <LoginButton />
+  )
 }
