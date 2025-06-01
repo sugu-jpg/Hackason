@@ -1,4 +1,5 @@
-// src/app/page.tsx
+'use client';
+// src/app'use client';/page.tsx
 
 import BabylonScene from '@/components/BabylonScene';
 
