@@ -1,4 +1,5 @@
 // src/app/page.tsx
+"use client"
 
 import BabylonScene from '@/components/BabylonScene';
 import LogOutButton from '@/components/header/logOutButton';
