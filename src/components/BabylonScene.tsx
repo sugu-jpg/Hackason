@@ -1,6 +1,9 @@
 'use client';
 
+import '@babylonjs/loaders';
+import { SceneLoader } from '@babylonjs/core/Loading/sceneLoader';
 import { useEffect, useRef, useState } from 'react';
+import "@babylonjs/loaders/glTF";
 import {
   Engine,
   Scene,
@@ -63,18 +66,30 @@ const BabylonScene = () => {
     for (let i = 0; i < 30; i++) {
       const theta = Math.random() * 2 * Math.PI;
       const phi = Math.random() * Math.PI;
-
+    
       const x = radius * Math.sin(phi) * Math.cos(theta);
       const y = radius * Math.cos(phi);
       const z = radius * Math.sin(phi) * Math.sin(theta);
 
-      const enemy = MeshBuilder.CreateSphere(`enemy-${i}`, { diameter: 1 }, scene);
-      enemy.position = new Vector3(x, y, z);
-
-      const mat = new StandardMaterial(`enemy-mat-${i}`, scene);
-      mat.diffuseColor = Color3.Red();
-      enemy.material = mat;
-      enemies.push(enemy);
+      const center = new Vector3(0, 1.6, 0);
+    
+      SceneLoader.ImportMesh(
+        '',
+        '/models/',         // public/models/ojisan.glb に配置しておく
+        'ojisan3.glb',
+        scene,
+        (meshes) => {
+          const enemy = meshes[0] as Mesh;
+          enemy.position = new Vector3(x, y, z);
+          enemy.scaling = new Vector3(2.0, 2.0, 2.0); // モデルが大きい場合に調整
+          enemy.lookAt(center);
+          enemies.push(enemy);
+        },
+        undefined,
+        (error) => {
+          console.error('ojisan.glb 読み込み失敗:', error);
+        }
+      );
     }
 
     const inputMap: Record<string, boolean> = {};
