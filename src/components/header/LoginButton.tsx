@@ -6,7 +6,7 @@ export default function LoginButton() {
     <form
       action={async () => {
         "use server";
-        await signIn("google", { redirectTo: "/game" });
+        await signIn("google", { redirectTo: "/mypage" });
       }}
     >
       <button type="submit" className="w-fit">
