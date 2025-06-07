@@ -100,6 +100,7 @@ const BabylonScene = () => {
     const enemies: Mesh[] = [];
     const enemyStates = new Map<Mesh, Vector3>();
     const enemyInitialPositions = new Map<Mesh, Vector3>();
+    const enemyAttackTimers = new Map<Mesh, number>(); // 各敵の攻撃タイマー
 
     // 弾丸関連
     const bullets: Mesh[] = [];
@@ -184,9 +185,9 @@ const BabylonScene = () => {
       }, 800);
     };
 
-    // 敵をスポーンする関数
+    // 敵をスポーンする関数（修正版）
     const spawnEnemy = () => {
-      if (gameOver) return; // ゲームオーバー時はスポーンしない
+      if (gameOver) return;
 
       const theta = Math.random() * 2 * Math.PI;
       const x = radius * Math.cos(theta);
@@ -200,7 +201,6 @@ const BabylonScene = () => {
         scene,
         (meshes) => {
           if (gameOver) {
-            // ゲームオーバー後にロードが完了した場合は即座に削除
             meshes.forEach((mesh) => mesh.dispose());
             return;
           }
@@ -212,6 +212,11 @@ const BabylonScene = () => {
           enemies.push(enemy);
           enemyStates.set(enemy, Vector3.Zero());
           enemyInitialPositions.set(enemy, enemy.position.clone());
+          
+          // 新しい敵には3-6秒の初期攻撃遅延を設定
+          const initialDelay = Math.random() * 2000 + 2500; // 2-4.5秒
+          enemyAttackTimers.set(enemy, Date.now() + initialDelay);
+          
           setEnemyCount(enemies.length);
         },
         undefined,
@@ -291,6 +296,28 @@ const BabylonScene = () => {
       }, 10000);
     };
 
+    // 敵の攻撃処理を個別管理する改良版
+    const processEnemyShooting = () => {
+      if (gameOver) return;
+      
+      const currentTime = Date.now();
+      
+      enemies.forEach((enemy) => {
+        const lastAttackTime = enemyAttackTimers.get(enemy);
+        if (lastAttackTime && currentTime >= lastAttackTime) {
+          // この敵が攻撃する
+          const directionToPlayer = camera.position
+            .subtract(enemy.position)
+            .normalize();
+          createEnemyBullet(enemy.position, directionToPlayer);
+          
+          // 次の攻撃時間を設定（3-6秒後）
+          const nextAttackDelay = Math.random() * 3000 + 3000; // 3-6秒
+          enemyAttackTimers.set(enemy, currentTime + nextAttackDelay);
+        }
+      });
+    };
+
     // 敵の移動方向を1秒ごとに更新
     const enemyMoveInterval = setInterval(() => {
       if (gameOver) {
@@ -321,23 +348,16 @@ const BabylonScene = () => {
           spawnEnemy();
         }
       }
-    }, 3000);
+    }, 2500);
 
-    // 敵が弾丸を発射
+    // 敵の攻撃処理を定期的に実行（0.2秒ごとにチェック）
     const shootingInterval = setInterval(() => {
-      if (gameOver || enemies.length === 0) {
+      if (gameOver) {
         clearInterval(shootingInterval);
         return;
       }
-
-      if (enemies.length > 0) {
-        const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
-        const directionToPlayer = camera.position
-          .subtract(randomEnemy.position)
-          .normalize();
-        createEnemyBullet(randomEnemy.position, directionToPlayer);
-      }
-    }, Math.random() * 2000 + 2000);
+      processEnemyShooting();
+    }, 200);
 
     const inputMap: Record<string, boolean> = {};
     let spacePressed = false;
@@ -415,14 +435,15 @@ const BabylonScene = () => {
             const enemy = enemies[j];
             const distance = Vector3.Distance(bullet.position, enemy.position);
             
-            if (distance < 1.5) { // 当たり判定の距離
+            if (distance < 1.5) {
               // 爆破エフェクトを作成
               createExplosion(enemy.position.clone());
               
-              // 敵を削除
+              // 敵を削除（攻撃タイマーも削除）
               enemies.splice(j, 1);
               enemyStates.delete(enemy);
               enemyInitialPositions.delete(enemy);
+              enemyAttackTimers.delete(enemy); // 攻撃タイマーも削除
               enemy.dispose();
               setEnemyCount(enemies.length);
               setHits((prevHits) => prevHits + 1);
