@@ -1,7 +1,10 @@
-import LogOutButton from "@/components/header/logOutButton";
-import { ReactNode } from "react";
 
-export default function Layout({ children }: { children: ReactNode }) {
+import LogOutButton from '@/components/header/logOutButton';
+
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+
+
   return (
     <div style={{ position: 'relative', height: '100vh' }}>
       {/* ログアウトボタンを固定位置に配置 */}
