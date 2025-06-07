@@ -1,7 +1,7 @@
 // components/BabylonScene.tsx
 "use client";
 
-import React, { memo } from "react";
+import React, { memo, useEffect, useRef } from "react";
 import { useGameState } from "../hooks/useGameState";
 import { useDeviceOrientation } from "../hooks/useDeviceOrientation";
 import { useBabylonGame } from "../hooks/useBabylonGame";
@@ -50,6 +50,42 @@ const BabylonScene = memo(() => {
     setPermissionGranted(granted);
   };
 
+  const bgmRef = useRef<HTMLAudioElement>(new Audio("/image/bgm1.mp3")); // 1回だけ作る
+
+  const playBgm = () => {
+    const audio = bgmRef.current;
+    audio.loop = true;
+    audio.volume = 0.02;
+
+    const handler = () => {
+      audio
+        .play()
+        .then(() => {
+          console.log("✅ BGM再生成功");
+        })
+        .catch((e) => {
+          console.warn("BGM再生エラー:", e);
+        });
+      document.removeEventListener("click", handler);
+    };
+
+    document.addEventListener("click", handler);
+  };
+
+  const stopBgm = () => {
+    const audio = bgmRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    audio.currentTime = 0;
+    console.log("🛑 BGM停止");
+  };
+
+  useEffect(() => {
+    playBgm();
+    return () => stopBgm();
+  }, []);
+
   return (
     <>
       {/* センサー許可ボタン */}
@@ -85,6 +121,6 @@ const BabylonScene = memo(() => {
   );
 });
 
-BabylonScene.displayName = 'BabylonScene';
+BabylonScene.displayName = "BabylonScene";
 
 export default BabylonScene;
