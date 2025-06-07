@@ -1,6 +1,7 @@
 // components/GameUI.tsx
 import React from 'react';
 import Link from 'next/link';
+import "./UI.css";
 
 interface GameUIProps {
   hp: number;
@@ -156,15 +157,24 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
-        background: "rgba(0,0,0,0.9)",
+        background: "linear-gradient(45deg, #8B0000, #DC143C, #8B0000)",
         color: "white",
         padding: "2em",
         borderRadius: "10px",
         zIndex: 30,
         textAlign: "center",
+        border: "3px solid #ff0000",
+        boxShadow: "0 0 50px #ff0000, inset 0 0 20px rgba(255,0,0,0.3)",
+        textShadow: "0 0 20px #ff0000, 0 0 30px #ff0000",
+        animation: "pulse 1.5s infinite alternate"
       }}
     >
-      <h2>ゲームオーバー！</h2>
+      <h2 style={{
+        margin: 0,
+        fontSize: "3rem",
+        animation: "shake 0.5s infinite",
+        textShadow: "0 0 30px #ff0000"
+      }}>ゲームオーバー！</h2>
       <p>ヒット数: {hits}</p>
       {isSubmitting ? (
         <p>結果を保存中...</p>
