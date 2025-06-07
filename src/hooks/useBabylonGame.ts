@@ -19,6 +19,8 @@ import { ParticleEffects } from "../utils/particleEffects";
 import { ApiService } from "../services/apiService";
 import { BulletSystem } from "../systems/bulletSystem";
 import { EnemySystem } from "../systems/enemySystem";
+import { playHpHitSE } from "@/utils/playHpHitSE";
+import { playShootSE } from "@/utils/playShootSE";
 
 interface UseBabylonGameProps {
   permissionGranted: boolean;
@@ -117,6 +119,7 @@ export const useBabylonGame = ({
         const bulletStartPos = camera.position.clone();
         const bulletDirection = camera.getDirection(Vector3.Forward());
         bulletSystem.createPlayerBullet(bulletStartPos, bulletDirection);
+        playShootSE(); // 👈 発射音をここで再生
       } else if (key === " " && !isKeyDown) {
         spacePressed = false;
       }
@@ -209,6 +212,7 @@ export const useBabylonGame = ({
         const distanceToPlayer = Vector3.Distance(enemyBullet.position, camera.position);
         if (distanceToPlayer < 1.0) {
           hpRef.current -= 1;
+          playHpHitSE();
           // UI更新は定期的なインターバルに任せる
           
           if (hpRef.current <= 0 && !gameOverRef.current) {

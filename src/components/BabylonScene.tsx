@@ -55,7 +55,7 @@ const BabylonScene = memo(() => {
   const playBgm = () => {
     const audio = bgmRef.current;
     audio.loop = true;
-    audio.volume = 0.02;
+    audio.volume = 0.3;
 
     const handler = () => {
       audio
