@@ -10,9 +10,13 @@ import {
   Color3,
   Animation,
 } from "@babylonjs/core";
+import { playExplosionSE } from "./playExplosionSE";
 
 export class ParticleEffects {
   static createExplosion(position: Vector3, scene: Scene): void {
+
+    playExplosionSE();
+
     // シンプルな爆破パーティクル
     const explosionParticles = new ParticleSystem("explosionParticles", 30, scene);
     explosionParticles.particleTexture = new Texture("https://playground.babylonjs.com/textures/flare.png", scene);
