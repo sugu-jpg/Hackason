@@ -1,7 +1,6 @@
 import { requireAuth } from "@/lib/auth-server";
 import Link from "next/link";
 import Image from "next/image";
-import Image from "next/image";
 
 export default async function Page() {
   const session = await requireAuth();
