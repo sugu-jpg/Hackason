@@ -24,6 +24,7 @@ import {
   Color4,
   Animation,
 } from "@babylonjs/core";
+import Link from "next/link";
 
 const BabylonScene = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -37,10 +38,53 @@ const BabylonScene = () => {
   const [enemyCount, setEnemyCount] = useState(0);
   const [hp, setHp] = useState(10);
   const [hits, setHits] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const gameOverRef = useRef(false); // 重複防止用のref
   const maxEnemies = 8;
 
+  // ゲーム結果をAPIに送信する関数
+  const submitGameResult = async (finalHits: number) => {
+    if (isSubmitting) return; // 重複送信防止
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/result", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          hits: finalHits,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        console.log("ゲーム結果が保存されました:", data);
+      } else {
+        console.error("ゲーム結果の保存に失敗:", data.error);
+      }
+    } catch (error) {
+      console.error("APIエラー:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ゲームオーバー処理
+  const handleGameOver = (finalHits: number) => {
+    if (gameOverRef.current) return; // 既にゲームオーバー処理が実行済みの場合は何もしない
+
+    gameOverRef.current = true;
+    setGameOver(true);
+    submitGameResult(finalHits);
+  };
+
   useEffect(() => {
-    if (!canvasRef.current || !permissionGranted) return;
+    if (!canvasRef.current || !permissionGranted || gameOver) return;
 
     const engine = new Engine(canvasRef.current, true);
     const scene = new Scene(engine);
@@ -50,31 +94,17 @@ const BabylonScene = () => {
     camera.speed = 0.2;
     camera.rotationQuaternion = Quaternion.Identity();
 
-    // const makeBox = (name: string, color: Color3, pos: Vector3) => {
-    //   const box = MeshBuilder.CreateBox(name, { size: 20 }, scene);
-    //   const mat = new StandardMaterial(`${name}-mat`, scene);
-    //   mat.diffuseColor = color;
-    //   box.material = mat;
-    //   box.position = pos;
-    // };
-
-    // makeBox("front", Color3.Red(), new Vector3(0, 0, 30));
-    // makeBox("right", Color3.Green(), new Vector3(30, 0, 0));
-    // makeBox("left", Color3.Yellow(), new Vector3(-30, 0, 0));
-    // makeBox("back", Color3.Blue(), new Vector3(0, 0, -30));
-    // makeBox("top", Color3.White(), new Vector3(0, 30, 0));
-
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
     light.intensity = 2.0;
 
     const enemies: Mesh[] = [];
-    const enemyStates = new Map<Mesh, Vector3>(); // 敵ごとの移動方向
-    const enemyInitialPositions = new Map<Mesh, Vector3>(); // 敵の初期位置
+    const enemyStates = new Map<Mesh, Vector3>();
+    const enemyInitialPositions = new Map<Mesh, Vector3>();
 
     // 弾丸関連
     const bullets: Mesh[] = [];
     const bulletVelocities = new Map<Mesh, Vector3>();
-    
+
     // 敵の弾丸関連
     const enemyBullets: Mesh[] = [];
     const enemyBulletVelocities = new Map<Mesh, Vector3>();
@@ -156,12 +186,11 @@ const BabylonScene = () => {
 
     // 敵をスポーンする関数
     const spawnEnemy = () => {
-      // X, Zは円周上に近いランダム位置
+      if (gameOver) return; // ゲームオーバー時はスポーンしない
+
       const theta = Math.random() * 2 * Math.PI;
       const x = radius * Math.cos(theta);
       const z = radius * Math.sin(theta);
-
-      // Y軸の高さだけランダムにする
       const y = Math.random() * (maxY - minY) + minY;
 
       SceneLoader.ImportMesh(
@@ -170,14 +199,20 @@ const BabylonScene = () => {
         "ojisan3.glb",
         scene,
         (meshes) => {
+          if (gameOver) {
+            // ゲームオーバー後にロードが完了した場合は即座に削除
+            meshes.forEach((mesh) => mesh.dispose());
+            return;
+          }
+
           const enemy = meshes[0] as Mesh;
-          enemy.position = new Vector3(x, y, z); // 高さをバラバラに設定
+          enemy.position = new Vector3(x, y, z);
           enemy.scaling = new Vector3(2.0, 2.0, 2.0);
           enemy.lookAt(center);
           enemies.push(enemy);
           enemyStates.set(enemy, Vector3.Zero());
           enemyInitialPositions.set(enemy, enemy.position.clone());
-          setEnemyCount(enemies.length); // 敵数を更新
+          setEnemyCount(enemies.length);
         },
         undefined,
         (error) => {
@@ -186,28 +221,32 @@ const BabylonScene = () => {
       );
     };
 
-    // 初期敵を生成（数を減らす）
+    // 初期敵を生成
     for (let i = 0; i < maxEnemies; i++) {
       spawnEnemy();
     }
 
     // 弾丸を作成する関数
     const createBullet = (position: Vector3, direction: Vector3) => {
-      const bullet = MeshBuilder.CreateSphere("bullet", { diameter: 0.2 }, scene);
+      if (gameOver) return;
+
+      const bullet = MeshBuilder.CreateSphere(
+        "bullet",
+        { diameter: 0.2 },
+        scene
+      );
       const bulletMaterial = new StandardMaterial("bullet-mat", scene);
       bulletMaterial.diffuseColor = Color3.Red();
       bulletMaterial.emissiveColor = Color3.Red();
       bullet.material = bulletMaterial;
       bullet.position = position.clone();
-      
-      // 弾丸の速度を設定
+
       const bulletSpeed = 0.5;
       const velocity = direction.normalize().scale(bulletSpeed);
-      
+
       bullets.push(bullet);
       bulletVelocities.set(bullet, velocity);
-      
-      // 5秒後に弾丸を自動削除
+
       setTimeout(() => {
         const index = bullets.indexOf(bullet);
         if (index > -1) {
@@ -220,21 +259,28 @@ const BabylonScene = () => {
 
     // 敵の弾丸を作成する関数
     const createEnemyBullet = (position: Vector3, direction: Vector3) => {
-      const enemyBullet = MeshBuilder.CreateSphere("enemyBullet", { diameter: 0.3 }, scene);
-      const enemyBulletMaterial = new StandardMaterial("enemyBullet-mat", scene);
+      if (gameOver) return;
+
+      const enemyBullet = MeshBuilder.CreateSphere(
+        "enemyBullet",
+        { diameter: 0.3 },
+        scene
+      );
+      const enemyBulletMaterial = new StandardMaterial(
+        "enemyBullet-mat",
+        scene
+      );
       enemyBulletMaterial.diffuseColor = Color3.Yellow();
       enemyBulletMaterial.emissiveColor = Color3.Yellow();
       enemyBullet.material = enemyBulletMaterial;
       enemyBullet.position = position.clone();
-      
-      // 敵の弾丸の速度を設定（かなり遅く）
+
       const enemyBulletSpeed = 0.08;
       const velocity = direction.normalize().scale(enemyBulletSpeed);
-      
+
       enemyBullets.push(enemyBullet);
       enemyBulletVelocities.set(enemyBullet, velocity);
-      
-      // 10秒後に敵の弾丸を自動削除
+
       setTimeout(() => {
         const index = enemyBullets.indexOf(enemyBullet);
         if (index > -1) {
@@ -246,58 +292,65 @@ const BabylonScene = () => {
     };
 
     // 敵の移動方向を1秒ごとに更新
-    setInterval(() => {
+    const enemyMoveInterval = setInterval(() => {
+      if (gameOver) {
+        clearInterval(enemyMoveInterval);
+        return;
+      }
+
       enemies.forEach((enemy) => {
         const newDir = new Vector3(
           (Math.random() - 0.5) * 2.0,
-          (Math.random() - 0.5) * 0.8, // Y方向にもふらつかせる
+          (Math.random() - 0.5) * 0.8,
           (Math.random() - 0.5) * 2.0
         );
-
         enemyStates.set(enemy, newDir);
       });
     }, 1000);
 
     // 敵の数をチェックして新しい敵をスポーンさせる
-    setInterval(() => {
+    const spawnInterval = setInterval(() => {
+      if (gameOver) {
+        clearInterval(spawnInterval);
+        return;
+      }
+
       if (enemies.length < maxEnemies) {
         const spawnCount = Math.min(2, maxEnemies - enemies.length);
         for (let i = 0; i < spawnCount; i++) {
           spawnEnemy();
         }
       }
-    }, 3000); // 3秒ごとにチェック
+    }, 3000);
 
-    // 敵が弾丸を発射（2-4秒ごとにランダムで発射）
-    const startEnemyShooting = () => {
-      const shootingInterval = setInterval(() => {
-        if (enemies.length === 0) {
-          clearInterval(shootingInterval);
-          return;
-        }
-        
-        // ランダムに選んだ敵が発射
-        if (enemies.length > 0) {
-          const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
-          const directionToPlayer = camera.position.subtract(randomEnemy.position).normalize();
-          createEnemyBullet(randomEnemy.position, directionToPlayer);
-        }
-      }, Math.random() * 2000 + 2000); // 2-4秒間隔
-    };
-    
-    startEnemyShooting();
+    // 敵が弾丸を発射
+    const shootingInterval = setInterval(() => {
+      if (gameOver || enemies.length === 0) {
+        clearInterval(shootingInterval);
+        return;
+      }
+
+      if (enemies.length > 0) {
+        const randomEnemy = enemies[Math.floor(Math.random() * enemies.length)];
+        const directionToPlayer = camera.position
+          .subtract(randomEnemy.position)
+          .normalize();
+        createEnemyBullet(randomEnemy.position, directionToPlayer);
+      }
+    }, Math.random() * 2000 + 2000);
 
     const inputMap: Record<string, boolean> = {};
     let spacePressed = false;
 
     scene.actionManager = new ActionManager(scene);
     scene.onKeyboardObservable.add((kbInfo) => {
+      if (gameOver) return;
+
       const key = kbInfo.event.key.toLowerCase();
       const isKeyDown = kbInfo.type === KeyboardEventTypes.KEYDOWN;
-      
+
       inputMap[key] = isKeyDown;
-      
-      // スペースキーで弾丸発射（連射防止）
+
       if (key === " " && isKeyDown && !spacePressed) {
         spacePressed = true;
         const bulletStartPos = camera.position.clone();
@@ -309,6 +362,8 @@ const BabylonScene = () => {
     });
 
     const handleOrientation = (event: DeviceOrientationEvent) => {
+      if (gameOver) return;
+
       if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
         const alpha = Tools.ToRadians(event.alpha);
         const beta = Tools.ToRadians(event.beta);
@@ -333,6 +388,8 @@ const BabylonScene = () => {
     window.addEventListener("deviceorientation", handleOrientation, true);
 
     scene.onBeforeRenderObservable.add(() => {
+      if (gameOver) return;
+
       const forward = camera.getDirection(Vector3.Forward());
       const right = camera.getDirection(Vector3.Right());
 
@@ -349,10 +406,10 @@ const BabylonScene = () => {
       for (let i = bullets.length - 1; i >= 0; i--) {
         const bullet = bullets[i];
         const velocity = bulletVelocities.get(bullet);
-        
+
         if (velocity) {
           bullet.position.addInPlace(velocity);
-          
+
           // 弾丸が敵に当たったかチェック
           for (let j = enemies.length - 1; j >= 0; j--) {
             const enemy = enemies[j];
@@ -367,39 +424,38 @@ const BabylonScene = () => {
               enemyStates.delete(enemy);
               enemyInitialPositions.delete(enemy);
               enemy.dispose();
-              setEnemyCount(enemies.length); // 敵数を更新
-              setHits(prevHits => prevHits + 1); // ヒット数を増加
-              
-              // 弾丸を削除
+              setEnemyCount(enemies.length);
+              setHits((prevHits) => prevHits + 1);
+
               bullets.splice(i, 1);
               bulletVelocities.delete(bullet);
               bullet.dispose();
-              
-              break; // 一つの弾丸は一つの敵にしか当たらない
-            }
-          }
-          
-          // プレイヤーの弾丸が敵の弾丸に当たったかチェック
-          for (let k = enemyBullets.length - 1; k >= 0; k--) {
-            const enemyBullet = enemyBullets[k];
-            const distance = Vector3.Distance(bullet.position, enemyBullet.position);
-            
-            if (distance < 0.4) { // 弾丸同士の当たり判定
-              // 敵の弾丸を削除
-              enemyBullets.splice(k, 1);
-              enemyBulletVelocities.delete(enemyBullet);
-              enemyBullet.dispose();
-              
-              // プレイヤーの弾丸を削除
-              bullets.splice(i, 1);
-              bulletVelocities.delete(bullet);
-              bullet.dispose();
-              
+
               break;
             }
           }
-          
-          // 弾丸が範囲外に出たら削除
+
+          // プレイヤーの弾丸が敵の弾丸に当たったかチェック
+          for (let k = enemyBullets.length - 1; k >= 0; k--) {
+            const enemyBullet = enemyBullets[k];
+            const distance = Vector3.Distance(
+              bullet.position,
+              enemyBullet.position
+            );
+
+            if (distance < 0.4) {
+              enemyBullets.splice(k, 1);
+              enemyBulletVelocities.delete(enemyBullet);
+              enemyBullet.dispose();
+
+              bullets.splice(i, 1);
+              bulletVelocities.delete(bullet);
+              bullet.dispose();
+
+              break;
+            }
+          }
+
           if (Vector3.Distance(bullet.position, playerPosition) > 50) {
             bullets.splice(i, 1);
             bulletVelocities.delete(bullet);
@@ -412,30 +468,37 @@ const BabylonScene = () => {
       for (let i = enemyBullets.length - 1; i >= 0; i--) {
         const enemyBullet = enemyBullets[i];
         const velocity = enemyBulletVelocities.get(enemyBullet);
-        
+
         if (velocity) {
           enemyBullet.position.addInPlace(velocity);
-          
+
           // 敵の弾丸がプレイヤーに当たったかチェック
-          const distanceToPlayer = Vector3.Distance(enemyBullet.position, camera.position);
+          const distanceToPlayer = Vector3.Distance(
+            enemyBullet.position,
+            camera.position
+          );
           if (distanceToPlayer < 1.0) {
-            setHp(prevHp => {
+            setHp((prevHp) => {
               const newHp = prevHp - 1;
               console.log("HP reduced to:", newHp);
               if (newHp <= 0) {
-                alert("ゲームオーバー！");
+                // HPが0になったらゲームオーバー処理を実行（一度だけ）
+                if (!gameOverRef.current) {
+                  setHits((currentHits) => {
+                    handleGameOver(currentHits);
+                    return currentHits;
+                  });
+                }
               }
               return newHp;
             });
-            
-            // 敵の弾丸を削除
+
             enemyBullets.splice(i, 1);
             enemyBulletVelocities.delete(enemyBullet);
             enemyBullet.dispose();
             continue;
           }
-          
-          // 敵の弾丸が範囲外に出たら削除
+
           if (Vector3.Distance(enemyBullet.position, playerPosition) > 50) {
             enemyBullets.splice(i, 1);
             enemyBulletVelocities.delete(enemyBullet);
@@ -449,7 +512,6 @@ const BabylonScene = () => {
 
         if (distance < 2.0) {
           camera.position = new Vector3(0, 1.6, 0);
-          alert("敵にぶつかりました！");
           return;
         }
 
@@ -457,13 +519,11 @@ const BabylonScene = () => {
         if (moveVec) {
           enemy.position.addInPlace(moveVec.scale(0.02));
 
-          // 高さ制限を追加（プレイヤー真上に来ないように）
           const maxHeight = 6.0;
           const minHeight = -1.2;
           if (enemy.position.y > maxHeight) enemy.position.y = maxHeight;
           if (enemy.position.y < minHeight) enemy.position.y = minHeight;
 
-          // 近づきすぎたら離れ、遠すぎたら少し戻る
           if (distance < 8.0) {
             const away = enemy.position.subtract(playerPosition).normalize();
             const strength = 0.04 * (8.0 - distance);
@@ -476,7 +536,7 @@ const BabylonScene = () => {
             enemy.position.addInPlace(toCenter.scale(strength));
           }
 
-          enemy.lookAt(playerPosition); // 常に原点を向く
+          enemy.lookAt(playerPosition);
         }
       });
     });
@@ -489,11 +549,16 @@ const BabylonScene = () => {
     window.addEventListener("resize", handleResize);
 
     return () => {
+      // クリーンアップ時にインターバルをクリア
+      clearInterval(enemyMoveInterval);
+      clearInterval(spawnInterval);
+      clearInterval(shootingInterval);
+
       engine.dispose();
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("deviceorientation", handleOrientation);
     };
-  }, [permissionGranted]);
+  }, [permissionGranted, gameOver]);
 
   const requestPermission = async () => {
     if (
@@ -518,6 +583,16 @@ const BabylonScene = () => {
     }
   };
 
+  // ゲームリスタート機能
+  const restartGame = () => {
+    gameOverRef.current = false; // refもリセット
+    setHp(10);
+    setHits(0);
+    setGameOver(false);
+    setIsSubmitting(false);
+    setEnemyCount(0);
+  };
+
   return (
     <>
       {!permissionGranted && (
@@ -536,6 +611,70 @@ const BabylonScene = () => {
           センサーを有効にする
         </button>
       )}
+
+      {gameOver && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            background: "rgba(0,0,0,0.9)",
+            color: "white",
+            padding: "2em",
+            borderRadius: "10px",
+            zIndex: 30,
+            textAlign: "center",
+          }}
+        >
+          <h2>ゲームオーバー！</h2>
+          <p>ヒット数: {hits}</p>
+          {isSubmitting ? (
+            <p>結果を保存中...</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={restartGame}
+                style={{
+                  padding: "1em 2em",
+                  fontSize: "16px",
+                  marginTop: "1em",
+                  cursor: "pointer",
+                }}
+              >
+                もう一度プレイ
+              </button>
+              <Link href="/ranking">
+                <button
+                  onClick={restartGame}
+                  style={{
+                    padding: "1em 2em",
+                    fontSize: "16px",
+                    marginTop: "1em",
+                    cursor: "pointer",
+                  }}
+                >
+                  ランキングへ
+                </button>
+              </Link>
+              <Link href="/mypage">
+                <button
+                  onClick={restartGame}
+                  style={{
+                    padding: "1em 2em",
+                    fontSize: "16px",
+                    marginTop: "1em",
+                    cursor: "pointer",
+                  }}
+                >
+                  マイページへ
+                </button>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
       <canvas
         ref={canvasRef}
         style={{ width: "100%", height: "100vh", display: "block" }}
@@ -556,23 +695,22 @@ const BabylonScene = () => {
         }}
         className="relative"
       >
-   <div className="absolute left-[20%] top-[3vw]">
+        <div className="absolute left-[20%] top-[3vw]">
+          <img
+            src={"image/hits.webp"}
+            alt="ヒット数画像"
+            style={{
+              width: "20vw",
+              pointerEvents: "none",
+            }}
+          />
+          <div className="absolute md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl top-[20%] right-12">
+            {hits}
+          </div>
+        </div>
 
         <img
-          src={"image/hits.webp"} // ヒット数の画像
-          alt="ヒット数画像"
-          style={{
-            width: "20vw",
-            pointerEvents: "none",
-          }}
-        />
-               <div className="absolute md:text-3xl lg:text-4xl xl:text-5xl 2xl:text-6xl top-[20%] right-12">
-          {hits}
-        </div>
-   </div>
-         
-        <img
-          src={"image/"+hp+".webp"} // HP画像
+          src={"image/" + hp + ".webp"}
           alt="HP画像"
           style={{
             width: "20vw",
@@ -582,7 +720,7 @@ const BabylonScene = () => {
           className="absolute right-[20%] top-[3vw]"
         />
         <img
-          src="image/pit.webp" // 実際のPNG画像のパスに変更
+          src="image/pit.webp"
           alt="オーバーレイ画像"
           style={{
             maxWidth: "100%",
@@ -614,7 +752,10 @@ const BabylonScene = () => {
           <div>操作方法:</div>
           <div>WASD: 移動</div>
           <div>スペース: 弾丸発射</div>
-          <div>敵数: {enemyCount}/{maxEnemies}</div>
+          <div>
+            敵数: {enemyCount}/{maxEnemies}
+          </div>
+          {gameOver && <div style={{ color: "red" }}>ゲームオーバー</div>}
         </div>
       </div>
     </>
