@@ -14,6 +14,7 @@ import {
   Quaternion,
   Matrix,
   Color4,
+  PhotoDome,
 } from "@babylonjs/core";
 import { ParticleEffects } from "../utils/particleEffects";
 import { ApiService } from "../services/apiService";
@@ -51,6 +52,37 @@ export const useBabylonGame = ({
 }: UseBabylonGameProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // プレイヤー移動範囲の制限設定
+  const MOVEMENT_RADIUS = 40.0; // プレイヤーが移動できる水平半径
+  const MAX_HEIGHT = 40.0; // 最大高度
+  const MIN_HEIGHT = -40.0; // 最小高度
+  const ORIGIN_POSITION = new Vector3(0, 1.6, 0); // 原点位置
+
+  // プレイヤー位置を範囲内に制限する関数
+  const constrainPlayerPosition = (camera: FreeCamera): void => {
+    const currentPos = camera.position;
+    
+    // 水平方向の制限（X-Z平面）
+    const horizontalPosition = new Vector3(currentPos.x, ORIGIN_POSITION.y, currentPos.z);
+    const horizontalDistance = Vector3.Distance(horizontalPosition, ORIGIN_POSITION);
+    
+    if (horizontalDistance > MOVEMENT_RADIUS) {
+      // 原点からプレイヤーへの水平方向ベクトルを取得
+      const horizontalDirection = horizontalPosition.subtract(ORIGIN_POSITION).normalize();
+      // 制限範囲内の位置に補正
+      const constrainedHorizontalPos = ORIGIN_POSITION.add(horizontalDirection.scale(MOVEMENT_RADIUS));
+      camera.position.x = constrainedHorizontalPos.x;
+      camera.position.z = constrainedHorizontalPos.z;
+    }
+    
+    // 垂直方向（Y軸）の制限
+    if (camera.position.y > MAX_HEIGHT) {
+      camera.position.y = MAX_HEIGHT;
+    } else if (camera.position.y < MIN_HEIGHT) {
+      camera.position.y = MIN_HEIGHT;
+    }
+  };
+
   // ゲームオーバー処理
   const handleGameOver = (finalHits: number) => {
     if (gameOverRef.current) return;
@@ -70,8 +102,24 @@ export const useBabylonGame = ({
     const engine = new Engine(canvasRef.current, true);
     const scene = new Scene(engine);
 
-    // 背景設定（フォールバック）
-    scene.clearColor = new Color4(0.1, 0.1, 0.3, 1.0);
+        // 360度背景画像を設定
+    try {
+      const photoDome = new PhotoDome(
+        "photoDome",
+        "/image/bg4.jpg", // 360度画像のパス
+        {
+          resolution: 32,
+          size: 1000,
+          useDirectMapping: false
+        },
+        scene
+      );
+      console.log("✅ 360度背景画像を読み込みました");
+    } catch (error) {
+      console.warn("360度背景画像の読み込みに失敗、フォールバック背景を使用:", error);
+      // 360度画像の読み込みに失敗した場合はフォールバック背景
+      scene.clearColor = new Color4(0.1, 0.1, 0.3, 1.0);
+    }
 
     // カメラとライト設定
     const camera = new FreeCamera("camera", new Vector3(0, 1.6, 0), scene);
@@ -119,7 +167,7 @@ export const useBabylonGame = ({
         const bulletStartPos = camera.position.clone();
         const bulletDirection = camera.getDirection(Vector3.Forward());
         bulletSystem.createPlayerBullet(bulletStartPos, bulletDirection);
-        playShootSE(); // 👈 発射音をここで再生
+        playShootSE(); // 発射音をここで再生
       } else if (key === " " && !isKeyDown) {
         spacePressed = false;
       }
@@ -159,12 +207,18 @@ export const useBabylonGame = ({
       const forward = camera.getDirection(Vector3.Forward());
       const right = camera.getDirection(Vector3.Right());
 
+      // 移動前の位置を保存
+      const previousPosition = camera.position.clone();
+
       if (inputMap["w"]) camera.position.addInPlace(forward.scale(camera.speed));
       if (inputMap["s"]) camera.position.addInPlace(forward.scale(-camera.speed));
       if (inputMap["a"]) camera.position.addInPlace(right.scale(-camera.speed));
       if (inputMap["d"]) camera.position.addInPlace(right.scale(camera.speed));
 
-      const playerPosition = new Vector3(0, 1.6, 0);
+      // プレイヤー位置を制限範囲内に制約
+      constrainPlayerPosition(camera);
+
+      const playerPosition = camera.position.clone();
 
       // 弾丸システム更新
       const { playerBullets, enemyBullets } = bulletSystem.updateBullets(playerPosition);
@@ -232,7 +286,8 @@ export const useBabylonGame = ({
       enemies.forEach((enemy) => {
         const distance = Vector3.Distance(enemy.position, camera.position);
         if (distance < 2.0) {
-          camera.position = new Vector3(0, 1.6, 0);
+          // 衝突時は原点にリセット
+          camera.position = ORIGIN_POSITION.clone();
         }
       });
     });

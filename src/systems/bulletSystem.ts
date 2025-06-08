@@ -11,8 +11,12 @@ import {
 export class BulletSystem {
   private bullets: Mesh[] = [];
   private bulletVelocities = new Map<Mesh, Vector3>();
+  private bulletStartPositions = new Map<Mesh, Vector3>(); // 弾丸の発射位置を記録
   private enemyBullets: Mesh[] = [];
   private enemyBulletVelocities = new Map<Mesh, Vector3>();
+
+  // 弾丸の最大射程距離
+  private readonly MAX_BULLET_RANGE = 20.0;
 
   constructor(private scene: Scene) {}
 
@@ -28,13 +32,14 @@ export class BulletSystem {
     bullet.material = bulletMaterial;
     bullet.position = position.clone();
 
-    const bulletSpeed = 0.5;
+    const bulletSpeed = 1;
     const velocity = direction.normalize().scale(bulletSpeed);
 
     this.bullets.push(bullet);
     this.bulletVelocities.set(bullet, velocity);
+    this.bulletStartPositions.set(bullet, position.clone()); // 発射位置を記録
 
-    // 5秒後に削除
+    // 5秒後に削除（バックアップ）
     setTimeout(() => {
       this.removeBullet(bullet);
     }, 5000);
@@ -55,7 +60,7 @@ export class BulletSystem {
     enemyBullet.material = enemyBulletMaterial;
     enemyBullet.position = position.clone();
 
-    const enemyBulletSpeed = 0.08;
+    const enemyBulletSpeed = 0.5;
     const velocity = direction.normalize().scale(enemyBulletSpeed);
 
     this.enemyBullets.push(enemyBullet);
@@ -72,6 +77,7 @@ export class BulletSystem {
     if (index > -1) {
       this.bullets.splice(index, 1);
       this.bulletVelocities.delete(bullet);
+      this.bulletStartPositions.delete(bullet); // 発射位置の記録も削除
       bullet.dispose();
     }
   }
@@ -103,9 +109,20 @@ export class BulletSystem {
       }))
       .filter(data => data.velocity);
 
-    // 距離チェックと削除
+    // プレイヤーの弾丸の射程チェック
+    this.bullets.forEach(bullet => {
+      const startPos = this.bulletStartPositions.get(bullet);
+      if (startPos) {
+        const travelDistance = Vector3.Distance(bullet.position, startPos);
+        if (travelDistance > this.MAX_BULLET_RANGE) {
+          this.removeBullet(bullet);
+        }
+      }
+    });
+
+    // 距離チェックと削除（既存のロジック）
     [...this.bullets, ...this.enemyBullets].forEach(bullet => {
-      if (Vector3.Distance(bullet.position, playerPosition) > 50) {
+      if (Vector3.Distance(bullet.position, playerPosition) > 30) {
         if (this.bullets.includes(bullet)) {
           this.removeBullet(bullet);
         } else {
@@ -133,6 +150,7 @@ export class BulletSystem {
     this.bullets = [];
     this.enemyBullets = [];
     this.bulletVelocities.clear();
+    this.bulletStartPositions.clear();
     this.enemyBulletVelocities.clear();
   }
 }
