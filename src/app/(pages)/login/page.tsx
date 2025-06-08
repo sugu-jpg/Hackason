@@ -8,7 +8,7 @@ export default function Page() {
       <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet" />
 
       <div style={{
-        backgroundColor: 'rgb(50,50,76)',
+        backgroundImage: "url(/image/space360.jpg)",
         color: 'white',
         minHeight: '100vh',
         display: 'flex',
@@ -60,7 +60,7 @@ export default function Page() {
           }}>
             {/* 左ヘリベえ（小さく） */}
             <Image
-              src="/image/heli-bee.png"
+              src="/image/heli_touka.png"
               alt="ヘリベえ左" 
               width={150}
               height={150}
@@ -77,7 +77,7 @@ export default function Page() {
 
             {/* 右ヘリベえ（小さく） */}
             <Image
-              src="/image/heli-bee.png"
+              src="/image/heli_touka.png"
               alt="ヘリベえ右"
               width={150}
               height={150}

@@ -17,7 +17,7 @@ export default function HomePage() {
       <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet" />
 
       <div style={{
-        backgroundColor: 'rgb(50,50,76)',
+        backgroundImage: 'url(/image/space360.jpg)',
         color: 'white',
         minHeight: '100vh',
         display: 'flex',
@@ -58,7 +58,7 @@ export default function HomePage() {
           }}>
             {/* 左ヘリベえ */}
             <Image
-              src="/image/heli-bee.png"
+              src="/image/heli_touka.png"
               alt="ヘリベえ左" 
               width={300}
               height={300}
@@ -75,7 +75,7 @@ export default function HomePage() {
 
             {/* 右ヘリベえ */}
             <Image
-              src="/image/heli-bee.png"
+              src="/image/heli_touka.png"
               alt="ヘリベえ右"
               width={300}
               height={300}
