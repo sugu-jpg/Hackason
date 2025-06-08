@@ -6,8 +6,8 @@ export default function LogOutButton() {
       <style>
         {`
           .logout-button {
-            background: linear-gradient(135deg, #dc2626, #991b1b);
-            color: white;
+            background: linear-gradient(135deg, #e5e5e5, #cccccc);
+            color:  black;
             border: 2px solid #fbbf24;
             border-radius: 8px;
             padding: 8px 16px;

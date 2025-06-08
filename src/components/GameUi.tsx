@@ -151,72 +151,123 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   onRestart
 }) => {
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        background: "linear-gradient(45deg, #8B0000, #DC143C, #8B0000)",
-        color: "white",
-        padding: "2em",
-        borderRadius: "10px",
-        zIndex: 30,
-        textAlign: "center",
-        border: "3px solid #ff0000",
-        boxShadow: "0 0 50px #ff0000, inset 0 0 20px rgba(255,0,0,0.3)",
-        textShadow: "0 0 20px #ff0000, 0 0 30px #ff0000",
-        animation: "pulse 1.5s infinite alternate"
-      }}
-    >
-      <h2 style={{
-        margin: 0,
-        fontSize: "3rem",
-        animation: "shake 0.5s infinite",
-        textShadow: "0 0 30px #ff0000"
-      }}>ゲームオーバー！</h2>
-      <p>ヒット数: {hits}</p>
-      {isSubmitting ? (
-        <p>結果を保存中...</p>
-      ) : (
-        <div className="flex flex-col gap-4">
+  <div
+    style={{
+      position: "fixed",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      background: "radial-gradient(circle at top left, #0f172a, #1e293b)", // 宇宙感ある深いブルーグラデ
+      color: "#e0f2fe", // 明るいシアン系
+      padding: "3em",
+      borderRadius: "20px",
+      zIndex: 30,
+      textAlign: "center",
+      border: "2px solid #38bdf8", // ネオンブルー
+      boxShadow: "0 0 30px #38bdf8, 0 0 60px #38bdf8, inset 0 0 20px #0ea5e9", // 外と内側両方がグロー
+      animation: "fadeIn 1s ease",
+      backdropFilter: "blur(8px)", // 背景ぼかしで未来感アップ
+    }}
+  >
+    <h2 style={{
+      margin: 0,
+      fontSize: "3rem",
+      fontWeight: "bold",
+      color: "#7dd3fc", // 淡いシアンブルー
+      marginBottom: "1.5rem",
+      textShadow: "0 0 10px #38bdf8, 0 0 20px #0ea5e9",
+    }}>
+      🚀 GAME OVER 🚀
+    </h2>
+    <p style={{
+      fontSize: "1.5rem",
+      marginBottom: "2rem",
+      color: "#bae6fd",
+    }}>
+      ヒット数: {hits}
+    </p>
+    {isSubmitting ? (
+      <p>結果を保存中...</p>
+    ) : (
+      <div className="flex flex-col gap-4">
+        <button
+          onClick={onRestart}
+          style={{
+            padding: "1em 2em",
+            fontSize: "18px",
+            marginTop: "1em",
+            cursor: "pointer",
+            borderRadius: "12px",
+            border: "1px solid #38bdf8",
+            backgroundColor: "transparent",
+            color: "#38bdf8",
+            boxShadow: "0 0 10px #38bdf8",
+            transition: "all 0.3s",
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = "#38bdf8";
+            e.currentTarget.style.color = "#0f172a";
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = "#38bdf8";
+          }}
+        >
+          もう一度プレイ
+        </button>
+        <Link href="/ranking">
           <button
-            onClick={onRestart}
             style={{
               padding: "1em 2em",
-              fontSize: "16px",
+              fontSize: "18px",
               marginTop: "1em",
               cursor: "pointer",
+              borderRadius: "12px",
+              border: "1px solid #38bdf8",
+              backgroundColor: "transparent",
+              color: "#38bdf8",
+              boxShadow: "0 0 10px #38bdf8",
+              transition: "all 0.3s",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "#38bdf8";
+              e.currentTarget.style.color = "#0f172a";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "#38bdf8";
             }}
           >
-            もう一度プレイ
+            ランキングへ
           </button>
-          <Link href="/ranking">
-            <button
-              style={{
-                padding: "1em 2em",
-                fontSize: "16px",
-                marginTop: "1em",
-                cursor: "pointer",
-              }}
-            >
-              ランキングへ
-            </button>
-          </Link>
-          <Link href="/mypage">
-            <button
-              style={{
-                padding: "1em 2em",
-                fontSize: "16px",
-                marginTop: "1em",
-                cursor: "pointer",
-              }}
-            >
-              マイページへ
-            </button>
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-};
+        </Link>
+        <Link href="/mypage">
+          <button
+            style={{
+              padding: "1em 2em",
+              fontSize: "18px",
+              marginTop: "1em",
+              cursor: "pointer",
+              borderRadius: "12px",
+              border: "1px solid #38bdf8",
+              backgroundColor: "transparent",
+              color: "#38bdf8",
+              boxShadow: "0 0 10px #38bdf8",
+              transition: "all 0.3s",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "#38bdf8";
+              e.currentTarget.style.color = "#0f172a";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent";
+              e.currentTarget.style.color = "#38bdf8";
+            }}
+          >
+            マイページへ
+          </button>
+        </Link>
+      </div>
+    )}
+  </div>
+);
