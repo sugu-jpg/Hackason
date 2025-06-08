@@ -99,10 +99,7 @@ export const GameUI: React.FC<GameUIProps> = ({
           zIndex: 10,
         }}
       >
-        <div>Alpha（ヨー）: {orientation.alpha.toFixed(1)}°</div>
-        <div>Beta（ピッチ）: {orientation.beta.toFixed(1)}°</div>
-        <div>Gamma（ロール）: {orientation.gamma.toFixed(1)}°</div>
-        <div style={{ marginTop: "10px", fontSize: "12px" }}>
+        <div style={{ fontSize: "12px" }}>
           <div>操作方法:</div>
           <div>WASD: 移動</div>
           <div>スペース: 弾丸発射</div>
