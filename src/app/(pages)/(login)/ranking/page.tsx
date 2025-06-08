@@ -59,11 +59,15 @@ export default async function RankingPage() {
     }));
 
   return (
-    <div className="min-h-screen" style={{ backgroundImage: "url('/image/space360.jpg')"}}>
+    <div className="min-h-screen pt-8" style={{ backgroundImage: "url('/image/space360.jpg')"}}>
       <div className="max-w-4xl mx-auto">
         {/* ヘッダー */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent" 
+            style={{
+            fontFamily: 'Anton, sans-serif',
+            textShadow: '3px 3px 0 #FF0000, -3px -3px 0 #0000FF',
+            marginBottom: '10px'}}>
             🏆 ランキング 🏆
           </h1>
           <p className="text-gray-300 text-lg">
