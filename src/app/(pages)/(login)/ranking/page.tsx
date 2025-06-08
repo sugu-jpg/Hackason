@@ -59,7 +59,7 @@ export default async function RankingPage() {
     }));
 
   return (
-    <div className="min-h-screen  p-6 bg-black">
+    <div className="min-h-screen" style={{ backgroundImage: "url('/image/space360.jpg')"}}>
       <div className="max-w-4xl mx-auto">
         {/* ヘッダー */}
         <div className="text-center mb-8">
