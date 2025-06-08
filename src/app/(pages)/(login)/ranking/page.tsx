@@ -72,7 +72,7 @@ export default async function RankingPage() {
         </div>
 
         {/* ランキングテーブル */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl overflow-hidden h-[550px] overflow-y-scroll">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gradient-to-r from-purple-600 to-blue-600">
