@@ -50,9 +50,12 @@ const BabylonScene = memo(() => {
     setPermissionGranted(granted);
   };
 
-  const bgmRef = useRef<HTMLAudioElement>(new Audio("/image/bgm1.mp3")); // 1回だけ作る
+  // useRefで初期値をnullにし、useEffect内で初期化
+  const bgmRef = useRef<HTMLAudioElement | null>(null);
 
   const playBgm = () => {
+    if (!bgmRef.current) return;
+    
     const audio = bgmRef.current;
     audio.loop = true;
     audio.volume = 0.3;
@@ -81,9 +84,21 @@ const BabylonScene = memo(() => {
     console.log("🛑 BGM停止");
   };
 
+  // useEffect内でAudioオブジェクトを初期化（クライアントサイドでのみ実行）
   useEffect(() => {
-    playBgm();
-    return () => stopBgm();
+    // ブラウザ環境でのみAudioオブジェクトを作成
+    if (typeof window !== 'undefined') {
+      bgmRef.current = new Audio("/image/bgm1.mp3");
+      playBgm();
+    }
+
+    return () => {
+      stopBgm();
+      // クリーンアップ時にAudioオブジェクトを削除
+      if (bgmRef.current) {
+        bgmRef.current = null;
+      }
+    };
   }, []);
 
   return (

@@ -36,7 +36,7 @@ export const useGameState = () => {
   const gameOverRef = useRef(false);
   const hpRef = useRef(10);
   const hitsRef = useRef(0);
-  const maxEnemies = 10;
+  const maxEnemies = 20;
 
   // HPとヒット数を更新する関数（refと状態の両方を更新）
   // useCallbackでメモ化して不要な再描画を防ぐ

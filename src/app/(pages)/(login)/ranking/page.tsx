@@ -63,7 +63,7 @@ export default async function RankingPage() {
       <div className="max-w-4xl mx-auto">
         {/* ヘッダー */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text">
             🏆 ランキング 🏆
           </h1>
           <p className="text-gray-300 text-lg">
