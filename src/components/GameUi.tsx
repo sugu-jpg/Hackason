@@ -125,6 +125,7 @@ export const PermissionButton: React.FC<PermissionButtonProps> = ({ onRequestPer
     <button
       onClick={onRequestPermission}
       style={{
+        color: "white",
         position: "fixed",
         top: "50%",
         left: "50%",
@@ -134,7 +135,7 @@ export const PermissionButton: React.FC<PermissionButtonProps> = ({ onRequestPer
         zIndex: 20,
       }}
     >
-      センサーを有効にする
+      クリックして出撃
     </button>
   );
 };

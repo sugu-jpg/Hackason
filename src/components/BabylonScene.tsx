@@ -120,7 +120,7 @@ const BabylonScene = memo(() => {
       {/* メインキャンバス */}
       <canvas
         ref={canvasRef}
-        style={{ width: "100%", height: "100vh", display: "block" }}
+        style={{ width: "100%", height: "100vh", display: "block",backgroundColor: "black" }}
       />
 
       {/* ゲームUI */}
