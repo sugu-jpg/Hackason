@@ -1,4 +1,4 @@
-// hooks/useBabylonGame.ts
+// hooks/useBabylonGame.ts (視点ジャンプ修正版)
 import { useEffect, useRef } from "react";
 import "@babylonjs/loaders";
 import "@babylonjs/loaders/glTF";
@@ -8,13 +8,11 @@ import {
   FreeCamera,
   Vector3,
   HemisphericLight,
-  ActionManager,
-  KeyboardEventTypes,
-  Tools,
-  Quaternion,
-  Matrix,
   Color4,
   PhotoDome,
+  PointerEventTypes,
+  PointerInfo,
+  Observer,
 } from "@babylonjs/core";
 import { ParticleEffects } from "../utils/particleEffects";
 import { ApiService } from "../services/apiService";
@@ -44,7 +42,6 @@ export const useBabylonGame = ({
   updateHp,
   updateHits,
   setEnemyCount,
-  setOrientation,
   gameOverRef,
   hpRef,
   hitsRef,
@@ -53,29 +50,25 @@ export const useBabylonGame = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // プレイヤー移動範囲の制限設定
-  const MOVEMENT_RADIUS = 40.0; // プレイヤーが移動できる水平半径
-  const MAX_HEIGHT = 40.0; // 最大高度
-  const MIN_HEIGHT = -40.0; // 最小高度
-  const ORIGIN_POSITION = new Vector3(0, 1.6, 0); // 原点位置
+  const MOVEMENT_RADIUS = 40.0;
+  const MAX_HEIGHT = 40.0;
+  const MIN_HEIGHT = -40.0;
+  const ORIGIN_POSITION = new Vector3(0, 1.6, 0);
 
   // プレイヤー位置を範囲内に制限する関数
   const constrainPlayerPosition = (camera: FreeCamera): void => {
     const currentPos = camera.position;
     
-    // 水平方向の制限（X-Z平面）
     const horizontalPosition = new Vector3(currentPos.x, ORIGIN_POSITION.y, currentPos.z);
     const horizontalDistance = Vector3.Distance(horizontalPosition, ORIGIN_POSITION);
     
     if (horizontalDistance > MOVEMENT_RADIUS) {
-      // 原点からプレイヤーへの水平方向ベクトルを取得
       const horizontalDirection = horizontalPosition.subtract(ORIGIN_POSITION).normalize();
-      // 制限範囲内の位置に補正
       const constrainedHorizontalPos = ORIGIN_POSITION.add(horizontalDirection.scale(MOVEMENT_RADIUS));
       camera.position.x = constrainedHorizontalPos.x;
       camera.position.z = constrainedHorizontalPos.z;
     }
     
-    // 垂直方向（Y軸）の制限
     if (camera.position.y > MAX_HEIGHT) {
       camera.position.y = MAX_HEIGHT;
     } else if (camera.position.y < MIN_HEIGHT) {
@@ -88,7 +81,6 @@ export const useBabylonGame = ({
     if (gameOverRef.current) return;
     gameOverRef.current = true;
     
-    // ゲームオーバー時のみ状態を同期更新
     updateHits(finalHits);
     updateHp(0);
     setGameOver(true);
@@ -102,11 +94,11 @@ export const useBabylonGame = ({
     const engine = new Engine(canvasRef.current, true);
     const scene = new Scene(engine);
 
-        // 360度背景画像を設定
+    // 360度背景画像を設定
     try {
       const photoDome = new PhotoDome(
         "photoDome",
-        "/image/bg4.jpg", // 360度画像のパス
+        "/image/bg4.jpg",
         {
           resolution: 32,
           size: 1000,
@@ -117,15 +109,13 @@ export const useBabylonGame = ({
       console.log("✅ 360度背景画像を読み込みました");
     } catch (error) {
       console.warn("360度背景画像の読み込みに失敗、フォールバック背景を使用:", error);
-      // 360度画像の読み込みに失敗した場合はフォールバック背景
       scene.clearColor = new Color4(0.1, 0.1, 0.3, 1.0);
     }
 
-    // カメラとライト設定
+    // カメラ設定
     const camera = new FreeCamera("camera", new Vector3(0, 1.6, 0), scene);
-    camera.attachControl(canvasRef.current, true);
     camera.speed = 0.2;
-    camera.rotationQuaternion = Quaternion.Identity();
+    camera.inputs.clear();
 
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
     light.intensity = 2.0;
@@ -134,14 +124,136 @@ export const useBabylonGame = ({
     const bulletSystem = new BulletSystem(scene);
     const enemySystem = new EnemySystem(scene, bulletSystem, maxEnemies, setEnemyCount);
     
-    // カメラの参照を設定（ setCameraメソッドが存在する場合のみ）
-    if ('setCamera' in enemySystem && typeof (enemySystem as any).setCamera === 'function') {
-      (enemySystem as any).setCamera(camera);
-    }
+    enemySystem.setCamera(camera);
     
     enemySystem.initialize();
 
-    // UI更新用のインターバル（1秒ごとにヒット数とHPを更新）
+    // 🔒 ポインターロック管理
+    let isPointerLocked = false;
+    let autoLockRequested = false;
+
+    // 🔧 視点ジャンプ防止のための変数
+    const ROTATION_SENSITIVITY = 0.002;
+    const MAX_DELTA_MOVEMENT = 100; // 異常な大きさの移動値を制限
+    let lastValidMovementX = 0;
+    let lastValidMovementY = 0;
+    let consecutiveLargeMoves = 0;
+    const MAX_CONSECUTIVE_LARGE_MOVES = 2;
+
+    // ポインターロック状態の変化を監視
+    const handlePointerLockChange = () => {
+      isPointerLocked = document.pointerLockElement === canvasRef.current;
+      
+      if (isPointerLocked) {
+        console.log('🔒 ポインターロック開始 - 安定した視点移動が有効');
+        canvasRef.current!.style.cursor = 'none';
+        
+        // ポインターロック開始時にカウンターをリセット
+        consecutiveLargeMoves = 0;
+        lastValidMovementX = 0;
+        lastValidMovementY = 0;
+      } else {
+        console.log('🔓 ポインターロック終了');
+        canvasRef.current!.style.cursor = 'default';
+      }
+    };
+
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+
+    // 自動ポインターロック
+    const requestAutoPointerLock = () => {
+      if (!autoLockRequested && canvasRef.current && !gameOverRef.current) {
+        autoLockRequested = true;
+        
+        setTimeout(() => {
+          canvasRef.current?.requestPointerLock();
+          console.log('🎮 自動ポインターロック要求');
+        }, 1000);
+      }
+    };
+
+    requestAutoPointerLock();
+
+    // キャンバスクリックでもポインターロック
+    const handleCanvasClick = () => {
+      if (!isPointerLocked && !gameOverRef.current) {
+        canvasRef.current?.requestPointerLock();
+        console.log('🖱️ クリックによるポインターロック要求');
+      }
+    };
+
+    canvasRef.current.addEventListener('click', handleCanvasClick);
+
+    // 🔧 視点ジャンプを防ぐ安全なポインター制御
+    const pointerObserver: Observer<PointerInfo> = scene.onPointerObservable.add(
+      (pointerInfo: PointerInfo) => {
+        if (gameOverRef.current) return;
+        
+        // マウス移動による視点制御（ポインターロック時のみ）
+        if (pointerInfo.type === PointerEventTypes.POINTERMOVE && isPointerLocked) {
+          const event = pointerInfo.event as MouseEvent;
+          
+          // 🔧 movementX/Y の値を検証（異常に大きい値を除外）
+          let deltaX = event.movementX || 0;
+          let deltaY = event.movementY || 0;
+          
+          // 異常に大きい移動値を検出
+          const isLargeMovement = Math.abs(deltaX) > MAX_DELTA_MOVEMENT || Math.abs(deltaY) > MAX_DELTA_MOVEMENT;
+          
+          if (isLargeMovement) {
+            consecutiveLargeMoves++;
+            console.warn(`🚨 異常な移動値を検出: deltaX=${deltaX}, deltaY=${deltaY}`);
+            
+            // 連続して異常な値が続く場合は完全に無視
+            if (consecutiveLargeMoves > MAX_CONSECUTIVE_LARGE_MOVES) {
+              console.warn('🚫 連続する異常な移動値を無視');
+              return;
+            }
+            
+            // 最後の有効な値で制限
+            deltaX = Math.sign(deltaX) * Math.min(Math.abs(deltaX), Math.abs(lastValidMovementX) + 10);
+            deltaY = Math.sign(deltaY) * Math.min(Math.abs(deltaY), Math.abs(lastValidMovementY) + 10);
+          } else {
+            // 正常な値の場合、カウンターをリセット
+            consecutiveLargeMoves = 0;
+            lastValidMovementX = deltaX;
+            lastValidMovementY = deltaY;
+          }
+          
+          // 🔧 追加の安全チェック：極小値も無視
+          if (Math.abs(deltaX) < 0.1 && Math.abs(deltaY) < 0.1) {
+            return; // 無意味な小さい値は無視
+          }
+          
+          // 🔧 deltaの値をさらに制限（念のため）
+          deltaX = Math.max(-50, Math.min(50, deltaX));
+          deltaY = Math.max(-50, Math.min(50, deltaY));
+          
+          // 回転を適用
+          camera.rotation.y += deltaX * ROTATION_SENSITIVITY;
+          camera.rotation.x += deltaY * ROTATION_SENSITIVITY;
+          
+          // 垂直回転制限
+          camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+        }
+        
+        // 弾丸発射
+        else if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+          const event = pointerInfo.event as MouseEvent;
+          
+          if (event.button === 0) { // 左クリック
+            const bulletStartPos = camera.position.clone();
+            const bulletDirection = camera.getDirection(Vector3.Forward());
+            bulletSystem.createPlayerBullet(bulletStartPos, bulletDirection);
+            playShootSE();
+            
+            console.log('🔫 マウス左クリックで弾丸発射');
+          }
+        }
+      }
+    );
+
+    // UI更新用のインターバル
     const uiUpdateInterval = setInterval(() => {
       if (!gameOverRef.current) {
         updateHits(hitsRef.current);
@@ -149,73 +261,58 @@ export const useBabylonGame = ({
       }
     }, 1000);
 
-    // 入力処理
+    // カスタムキーボード制御
     const inputMap: Record<string, boolean> = {};
     let spacePressed = false;
 
-    scene.actionManager = new ActionManager(scene);
-    scene.onKeyboardObservable.add((kbInfo) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (gameOverRef.current) return;
+      
+      const key = event.key.toLowerCase();
+      inputMap[key] = true;
 
-      const key = kbInfo.event.key.toLowerCase();
-      const isKeyDown = kbInfo.type === KeyboardEventTypes.KEYDOWN;
-
-      inputMap[key] = isKeyDown;
-
-      if (key === " " && isKeyDown && !spacePressed) {
+      if (key === " " && !spacePressed) {
         spacePressed = true;
         const bulletStartPos = camera.position.clone();
         const bulletDirection = camera.getDirection(Vector3.Forward());
         bulletSystem.createPlayerBullet(bulletStartPos, bulletDirection);
-        playShootSE(); // 発射音をここで再生
-      } else if (key === " " && !isKeyDown) {
-        spacePressed = false;
+        playShootSE();
+        
+        console.log('⌨️ 左クリックで弾丸発射');
+        event.preventDefault();
       }
-    });
 
-    // デバイス方向制御
-    const handleOrientation = (event: DeviceOrientationEvent) => {
-      if (gameOverRef.current) return;
-
-      if (event.alpha !== null && event.beta !== null && event.gamma !== null) {
-        const alpha = Tools.ToRadians(event.alpha);
-        const beta = Tools.ToRadians(event.beta);
-        const gamma = Tools.ToRadians(event.gamma);
-
-        const rotationMatrix = Matrix.RotationYawPitchRoll(
-          gamma,
-          -beta + Math.PI / 2,
-          alpha * 0.01
-        );
-        camera.rotationQuaternion = Quaternion.FromRotationMatrix(rotationMatrix);
-
-        setOrientation({
-          alpha: event.alpha,
-          beta: event.beta,
-          gamma: event.gamma,
-        });
+      if (key === "escape") {
+        document.exitPointerLock();
       }
     };
 
-    window.addEventListener("deviceorientation", handleOrientation, true);
+    const handleKeyUp = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      inputMap[key] = false;
+
+      if (key === " ") {
+        spacePressed = false;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     // メインゲームループ
     scene.onBeforeRenderObservable.add(() => {
       if (gameOverRef.current) return;
 
-      // プレイヤー移動
+      // WASD移動
       const forward = camera.getDirection(Vector3.Forward());
       const right = camera.getDirection(Vector3.Right());
+      const moveSpeed = camera.speed;
 
-      // 移動前の位置を保存
-      const previousPosition = camera.position.clone();
+      if (inputMap["w"]) camera.position.addInPlace(forward.scale(moveSpeed));
+      if (inputMap["s"]) camera.position.addInPlace(forward.scale(-moveSpeed));
+      if (inputMap["a"]) camera.position.addInPlace(right.scale(-moveSpeed));
+      if (inputMap["d"]) camera.position.addInPlace(right.scale(moveSpeed));
 
-      if (inputMap["w"]) camera.position.addInPlace(forward.scale(camera.speed));
-      if (inputMap["s"]) camera.position.addInPlace(forward.scale(-camera.speed));
-      if (inputMap["a"]) camera.position.addInPlace(right.scale(-camera.speed));
-      if (inputMap["d"]) camera.position.addInPlace(right.scale(camera.speed));
-
-      // プレイヤー位置を制限範囲内に制約
       constrainPlayerPosition(camera);
 
       const playerPosition = camera.position.clone();
@@ -238,7 +335,6 @@ export const useBabylonGame = ({
             ParticleEffects.createExplosion(enemy.position.clone(), scene);
             enemySystem.removeEnemy(enemy);
             hitsRef.current += 1;
-            // UI更新は定期的なインターバルに任せる
             bulletSystem.removeBulletByInstance(bullet);
             break;
           }
@@ -262,12 +358,10 @@ export const useBabylonGame = ({
         const { bullet: enemyBullet, velocity } = enemyBullets[i];
         enemyBullet.position.addInPlace(velocity);
 
-        // プレイヤーとの当たり判定
         const distanceToPlayer = Vector3.Distance(enemyBullet.position, camera.position);
         if (distanceToPlayer < 1.0) {
           hpRef.current -= 1;
           playHpHitSE();
-          // UI更新は定期的なインターバルに任せる
           
           if (hpRef.current <= 0 && !gameOverRef.current) {
             handleGameOver(hitsRef.current);
@@ -286,7 +380,6 @@ export const useBabylonGame = ({
       enemies.forEach((enemy) => {
         const distance = Vector3.Distance(enemy.position, camera.position);
         if (distance < 2.0) {
-          // 衝突時は原点にリセット
           camera.position = ORIGIN_POSITION.clone();
         }
       });
@@ -303,13 +396,26 @@ export const useBabylonGame = ({
     // クリーンアップ
     return () => {
       clearInterval(uiUpdateInterval);
+      
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+      canvasRef.current?.removeEventListener('click', handleCanvasClick);
+      
+      if (pointerObserver) {
+        scene.onPointerObservable.remove(pointerObserver);
+      }
+      
+      if (document.pointerLockElement === canvasRef.current) {
+        document.exitPointerLock();
+      }
+      
       enemySystem.dispose();
       bulletSystem.dispose();
       engine.dispose();
       window.removeEventListener("resize", handleResize);
-      window.removeEventListener("deviceorientation", handleOrientation);
     };
-  }, [permissionGranted, gameOver, maxEnemies, updateHp, updateHits, setEnemyCount, setOrientation, gameOverRef, hpRef, hitsRef, setGameOver]);
+  }, [permissionGranted, gameOver]);
 
   return { canvasRef };
 };
