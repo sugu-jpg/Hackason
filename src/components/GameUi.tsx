@@ -21,7 +21,6 @@ export const GameUI: React.FC<GameUIProps> = ({
   hits,
   enemyCount,
   maxEnemies,
-  orientation,
   gameOver
 }) => {
   return (
@@ -102,7 +101,7 @@ export const GameUI: React.FC<GameUIProps> = ({
         <div style={{ fontSize: "12px" }}>
           <div>操作方法:</div>
           <div>WASD: 移動</div>
-          <div>スペース: 弾丸発射</div>
+          <div>左クリック: 弾丸発射</div>
           <div>
             敵数: {enemyCount}/{maxEnemies}
           </div>
